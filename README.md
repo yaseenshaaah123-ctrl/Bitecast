@@ -78,8 +78,8 @@ All free, no account needed at run time:
 - **City list for pre-loading:** [GeoNames](https://www.geonames.org/). **Place search:** [Photon](https://photon.komoot.io/).
 - **Basemap:** [OpenFreeMap](https://openfreemap.org/), © OpenMapTiles, © OpenStreetMap contributors.
 
-A place is fetched the first time someone opens it and cached after that. About 140 cities, including the
-five OneAquaHealth study sites (Benevento, Coimbra, Ghent, Oslo, Toulouse), are pre-loaded in `data/`.
+A place is fetched the first time someone opens it and cached after that. About 140 cities are
+pre-loaded, including the five OneAquaHealth study sites (Benevento, Coimbra, Ghent, Oslo, Toulouse).
 
 ## For health systems: FHIR
 
@@ -99,35 +99,7 @@ pip install -r requirements.txt
 uvicorn api:app --port 8000
 ```
 
-Then open http://localhost:8000. The API is documented at `/docs`.
-
-- `python check.py` runs every self-check and an API test across all cached places.
-- `python preload.py --top 40` pre-loads the next 40 biggest cities not cached yet.
-- `python sat.py` fetches the satellite layers for any cached place that lacks them.
-
-Bite reports are stored in Postgres when `DATABASE_URL` is set (we use [Neon](https://neon.tech/)), and in a
-local SQLite file otherwise. Put `DATABASE_URL=...` in a `.env` file or the environment; `.env` is ignored
-by git.
-
-**Deploying.** `render.yaml` runs the app on Render's free tier. A weekly GitHub Action
-(`.github/workflows/data.yml`) refreshes the weather for every cached place, pre-loads more cities and
-commits the data, so nothing depends on anyone's computer being on.
-
-## Layout
-
-```
-api.py            HTTP API and the web app (app/)
-model/            degree days, stagnation, habitat and exposure, species, containers, risk
-fetch.py          weather and OpenStreetMap downloads
-sat.py            satellite water and population layers
-places.py         any point on earth: fetch once, cache, keep fresh (refresh.py)
-presence.py       GBIF records per place
-feedback.py       bite reports; treatments.py larvicide log for control teams
-fhir/             FHIR R4 export
-validate*.py      the cross-city and GBIF checks
-app/              the web app (MapLibre, no build step)
-data/             cached weather, maps, satellite layers and species records
-```
+Then open http://localhost:8000.
 
 ## Limits
 

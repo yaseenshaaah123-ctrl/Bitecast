@@ -69,17 +69,27 @@ EXPOSURE_MARGIN_M = 500  # exposure searched wider so edge features still see th
 
 
 _mirror = 0  # start where the last successful call left off: a throttled mirror shouldn't be retried first
+_meteo_blocked_until = 0.0
+METEO_PAUSE_S = 900   # after an Open-Meteo 429, use the fallbacks for this long
 
 
 def request_json(method, urls, attempts=8, backoff=20, timeout=90, accept=None, **kw):
     """HTTP with retries, rotating through mirror urls on errors, 429 and 5xx.
     Public Overpass servers were seen returning 429/504 for minutes at a time, hence the patience.
     accept(url, json) -> False rejects a well-formed answer (e.g. suspiciously empty) and tries the next url."""
-    global _mirror
+    global _mirror, _meteo_blocked_until
+    if any("open-meteo" in u for u in urls) and time.time() < _meteo_blocked_until:
+        # it refused this server moments ago: go straight to the fallbacks instead of waiting on it again
+        raise RuntimeError("Open-Meteo is refusing this server for now (HTTP 429)")
     for i in range(attempts):
         url = urls[(_mirror + i) % len(urls)]
         try:
             r = requests.request(method, url, headers=HEADERS, timeout=timeout, **kw)
+            if r.status_code == 429 and "open-meteo" in url:
+                # a shared host (Render's free tier) can share its address with apps that used up the allowance
+                _meteo_blocked_until = time.time() + METEO_PAUSE_S
+                print(f"  {url}: HTTP 429; not asking Open-Meteo again for {METEO_PAUSE_S // 60} min", flush=True)
+                raise RuntimeError(f"{url}: HTTP 429")
             if r.status_code == 200:
                 j = r.json()
                 # Overpass reports query timeouts / memory errors as HTTP 200 with a "remark".

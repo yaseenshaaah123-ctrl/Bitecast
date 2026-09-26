@@ -120,7 +120,7 @@ def _temporal(sp, dates, w, lat, doy):
     return {"classes": classes, "drivers": drivers}
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=16)   # a few recent places in memory; the free server has 512 MB
 def weather_model(city):
     """The temporal half, per weather cell and per species modelled here.
 
@@ -160,7 +160,7 @@ def weather_model(city):
     }
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=16)
 def city_model(city):
     """Weather model + features: water for the water breeder, neighbourhoods for any container breeder.
     A feature treated with larvicide gets its own development series: its larvae die on the treatment day,

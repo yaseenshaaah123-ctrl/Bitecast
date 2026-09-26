@@ -16,6 +16,8 @@ import pandas as pd
 import fetch
 from cities import CITIES, grid_points
 
+ORIGINAL_REQUEST = fetch.request_json
+
 REAL = Path(__file__).parent / "data"
 tmp = Path(tempfile.mkdtemp())
 (tmp / "weather").mkdir()
@@ -127,6 +129,33 @@ got = pd.read_csv(tmp / "weather" / "at_test.csv", parse_dates=["date"])
 fc = got[(got["cell"] == 0) & (got["kind"] == "forecast")]
 assert len(fc) >= 7 and fc["precip"].sum() > 0 and not got.isna().any().any(), fc
 assert got.groupby("cell")["date"].apply(lambda s: s.diff().dropna().dt.days.eq(1).all()).all(), "gap"
+
+# once Open-Meteo answers 429, it is not asked again for a while: the next place goes straight to the fallbacks
+import requests
+fetch.request_json = ORIGINAL_REQUEST
+calls = []
+
+
+class Refused:
+    status_code = 429
+
+
+def refuse_all(method, url, **kw):
+    calls.append(url)
+    return Refused()
+
+
+real_http, requests.request = requests.request, refuse_all
+fetch._meteo_blocked_until = 0.0
+for _ in range(2):
+    try:
+        fetch.request_json("GET", [fetch.FORECAST], attempts=5, backoff=0, params={})
+        raise AssertionError("a 429 was accepted")
+    except RuntimeError:
+        pass
+assert len(calls) == 1, calls          # the first call stopped at the 429; the second never went out
+requests.request = real_http
+fetch._meteo_blocked_until = 0.0
 
 shutil.rmtree(tmp)
 print("ok")

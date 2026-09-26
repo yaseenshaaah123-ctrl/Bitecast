@@ -6,7 +6,7 @@
 name: data
 on:
   schedule:
-    - cron: "0 3 * * 1"
+    - cron: "0 2 * * *"   # daily: the live server can't reach Open-Meteo itself (shared address, HTTP 429)
   workflow_dispatch:
 permissions:
   contents: write
@@ -23,7 +23,7 @@ jobs:
       - run: pip install -r requirements.txt httpx
       - run: python refresh.py --all
       - run: python preload.py
-      - run: python preload.py --top 40      # the next biggest cities, while the weather allowance lasts
+      - run: python preload.py --top 10      # a few more of the biggest cities each day
       - run: python sat.py                   # satellite water and people for any place without them
       - run: python check.py
       - name: Commit the data

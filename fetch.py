@@ -26,7 +26,11 @@ FORECAST = "https://api.open-meteo.com/v1/forecast"
 # warning, so the fetcher rotates and retries; overpass-api.de publishes free slots at /api/status.
 # Never add a regional instance (overpass.osm.ch holds Switzerland only): for anywhere else it answers
 # 200 with no elements, which looks exactly like a place with no water.
+# overpass-api.de refuses connections from some cloud hosts (Render, 2026-09-26); its z. and lz4. servers
+# are separate machines and answered a dense-city query in 4-6 s.
 OVERPASS = ["https://overpass-api.de/api/interpreter",
+            "https://z.overpass-api.de/api/interpreter",
+            "https://lz4.overpass-api.de/api/interpreter",
             "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
             "https://overpass.kumi.systems/api/interpreter"]
 

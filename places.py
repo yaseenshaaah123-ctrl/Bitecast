@@ -183,6 +183,8 @@ def _load_map(key, place, weather_ready=None):
             if weather_ready:
                 weather_ready.wait(300)
             fetch.fetch_weather(key, place, full=True)
+        risk.weather_model.cache_clear()          # before saying "ready": the next request must see the water
+        risk.city_model.cache_clear()
         MAP_STATE[key] = {"stage": "ready"}
     except Exception as e:
         MAP_STATE[key] = {"stage": "error", "error": str(e)}

@@ -1,0 +1,15 @@
+# Render Blueprint: the free web service that serves BiteCast (render.com, no card needed).
+# The cached cities in data/ ship with the code; places searched later are fetched live. Render's free disk
+# resets on every deploy or restart, so those later places (and bite reports) do not survive one.
+services:
+  - type: web
+    name: bitecast
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/cities
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.3

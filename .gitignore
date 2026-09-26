@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+# local report databases: the live reports are kept in Postgres (DATABASE_URL)
+data/*.sqlite3
+
+data/geonames/
+
+# local settings: DATABASE_URL holds a password
+.env
+
+# editor and tool settings
+.claude/

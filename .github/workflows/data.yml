@@ -1,0 +1,39 @@
+# Keeps the committed data current in the cloud, on nobody's PC: every Monday (and on demand from the
+# Actions tab) it refreshes every cached place's weather, pre-loads popular cities and the next biggest ones,
+# fetches their satellite layers, checks
+# everything still passes, and commits the data. Render redeploys from that commit.
+# GitHub's runners get their own Open-Meteo allowance, and the NASA POWER fallback covers the rest.
+name: data
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt httpx
+      - run: python refresh.py --all
+      - run: python preload.py
+      - run: python preload.py --top 40      # the next biggest cities, while the weather allowance lasts
+      - run: python sat.py                   # satellite water and people for any place without them
+      - run: python check.py
+      - name: Commit the data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "nothing changed"
+          else
+            git commit -m "data: weekly refresh"
+            git push
+          fi

@@ -1,0 +1,291 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "timestamp": "2026-09-19T08:00:00Z",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:be929441-050e-59f7-a7e7-e206360fc499",
+      "resource": {
+        "resourceType": "Location",
+        "id": "coimbra-way-123",
+        "identifier": [
+          {
+            "system": "https://www.openstreetmap.org",
+            "value": "way/123"
+          }
+        ],
+        "status": "active",
+        "name": "FAKE test ditch",
+        "description": "drainage ditch (habitat class 'ditch') in Coimbra, PT; OpenStreetMap way/123, candidate Culex pipiens larval habitat.",
+        "mode": "instance",
+        "physicalType": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/location-physical-type",
+              "code": "area"
+            }
+          ],
+          "text": "drainage ditch"
+        },
+        "position": {
+          "longitude": -8.42,
+          "latitude": 40.21
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:64cc5346-bec0-5425-8c13-f36af887a9ff",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "coimbra-way-123-2026-09-19",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "https://bitecast.example/CodeSystem/vector-risk",
+              "code": "culex-pipiens-emergence-risk",
+              "display": "Culex pipiens emergence risk index"
+            }
+          ],
+          "text": "Culex pipiens emergence risk index"
+        },
+        "subject": {
+          "reference": "urn:uuid:be929441-050e-59f7-a7e7-e206360fc499",
+          "display": "FAKE test ditch"
+        },
+        "effectiveDateTime": "2026-09-19",
+        "issued": "2026-09-19T08:00:00Z",
+        "valueQuantity": {
+          "value": 62,
+          "unit": "index",
+          "system": "http://unitsofmeasure.org",
+          "code": "{index}"
+        },
+        "note": [
+          {
+            "text": "Risk band: high. FAKE explanation text for the self-check."
+          }
+        ],
+        "method": {
+          "text": "Degree-day model, Loetti et al. 2011 (Tb 5.5 C, K 199.5 DD); BiteCast model v2.1.0"
+        },
+        "component": [
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "https://bitecast.example/CodeSystem/vector-risk",
+                  "code": "factor-development",
+                  "display": "Risk factor: development (0-1, risk = 100 x product)"
+                }
+              ],
+              "text": "Risk factor: development (0-1, risk = 100 x product)"
+            },
+            "valueQuantity": {
+              "value": 0.81,
+              "unit": "1",
+              "system": "http://unitsofmeasure.org",
+              "code": "1"
+            }
+          },
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "https://bitecast.example/CodeSystem/vector-risk",
+                  "code": "factor-stagnation",
+                  "display": "Risk factor: stagnation (0-1, risk = 100 x product)"
+                }
+              ],
+              "text": "Risk factor: stagnation (0-1, risk = 100 x product)"
+            },
+            "valueQuantity": {
+              "value": 0.9,
+              "unit": "1",
+              "system": "http://unitsofmeasure.org",
+              "code": "1"
+            }
+          },
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "https://bitecast.example/CodeSystem/vector-risk",
+                  "code": "factor-habitat",
+                  "display": "Risk factor: habitat (0-1, risk = 100 x product)"
+                }
+              ],
+              "text": "Risk factor: habitat (0-1, risk = 100 x product)"
+            },
+            "valueQuantity": {
+              "value": 0.9,
+              "unit": "1",
+              "system": "http://unitsofmeasure.org",
+              "code": "1"
+            }
+          },
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "https://bitecast.example/CodeSystem/vector-risk",
+                  "code": "factor-exposure",
+                  "display": "Risk factor: exposure (0-1, risk = 100 x product)"
+                }
+              ],
+              "text": "Risk factor: exposure (0-1, risk = 100 x product)"
+            },
+            "valueQuantity": {
+              "value": 0.95,
+              "unit": "1",
+              "system": "http://unitsofmeasure.org",
+              "code": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f4fe1422-4b0d-5ea9-af2b-969c95a2db68",
+      "resource": {
+        "resourceType": "Location",
+        "id": "oslo-relation-456",
+        "identifier": [
+          {
+            "system": "https://www.openstreetmap.org",
+            "value": "relation/456"
+          }
+        ],
+        "status": "active",
+        "name": "Unnamed pond",
+        "description": "pond (habitat class 'pond') in Oslo, NO; OpenStreetMap relation/456, candidate Culex pipiens larval habitat.",
+        "mode": "instance",
+        "physicalType": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/location-physical-type",
+              "code": "area"
+            }
+          ],
+          "text": "pond"
+        },
+        "position": {
+          "longitude": 10.75,
+          "latitude": 59.905
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:2f82d869-0d1e-545d-ba51-0bb7a7c7059d",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "oslo-relation-456-2026-09-22",
+        "status": "preliminary",
+        "code": {
+          "coding": [
+            {
+              "system": "https://bitecast.example/CodeSystem/vector-risk",
+              "code": "culex-pipiens-emergence-risk",
+              "display": "Culex pipiens emergence risk index"
+            }
+          ],
+          "text": "Culex pipiens emergence risk index"
+        },
+        "subject": {
+          "reference": "urn:uuid:f4fe1422-4b0d-5ea9-af2b-969c95a2db68",
+          "display": "Unnamed pond"
+        },
+        "effectiveDateTime": "2026-09-22",
+        "issued": "2026-09-19T08:00:00Z",
+        "valueQuantity": {
+          "value": 3,
+          "unit": "index",
+          "system": "http://unitsofmeasure.org",
+          "code": "{index}"
+        },
+        "note": [
+          {
+            "text": "Risk band: low. FAKE explanation text for the self-check."
+          }
+        ],
+        "method": {
+          "text": "Degree-day model, Loetti et al. 2011 (Tb 5.5 C, K 199.5 DD); BiteCast model v2.1.0"
+        },
+        "component": [
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "https://bitecast.example/CodeSystem/vector-risk",
+                  "code": "factor-development",
+                  "display": "Risk factor: development (0-1, risk = 100 x product)"
+                }
+              ],
+              "text": "Risk factor: development (0-1, risk = 100 x product)"
+            },
+            "valueQuantity": {
+              "value": 0.1,
+              "unit": "1",
+              "system": "http://unitsofmeasure.org",
+              "code": "1"
+            }
+          },
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "https://bitecast.example/CodeSystem/vector-risk",
+                  "code": "factor-stagnation",
+                  "display": "Risk factor: stagnation (0-1, risk = 100 x product)"
+                }
+              ],
+              "text": "Risk factor: stagnation (0-1, risk = 100 x product)"
+            },
+            "valueQuantity": {
+              "value": 0.5,
+              "unit": "1",
+              "system": "http://unitsofmeasure.org",
+              "code": "1"
+            }
+          },
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "https://bitecast.example/CodeSystem/vector-risk",
+                  "code": "factor-habitat",
+                  "display": "Risk factor: habitat (0-1, risk = 100 x product)"
+                }
+              ],
+              "text": "Risk factor: habitat (0-1, risk = 100 x product)"
+            },
+            "valueQuantity": {
+              "value": 0.8,
+              "unit": "1",
+              "system": "http://unitsofmeasure.org",
+              "code": "1"
+            }
+          },
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "https://bitecast.example/CodeSystem/vector-risk",
+                  "code": "factor-exposure",
+                  "display": "Risk factor: exposure (0-1, risk = 100 x product)"
+                }
+              ],
+              "text": "Risk factor: exposure (0-1, risk = 100 x product)"
+            },
+            "valueQuantity": {
+              "value": 0.75,
+              "unit": "1",
+              "system": "http://unitsofmeasure.org",
+              "code": "1"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

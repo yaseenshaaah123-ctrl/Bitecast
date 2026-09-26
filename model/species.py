@@ -172,7 +172,7 @@ SURVEYED_MIN = 100        # this many mosquito records nearby (the modelled spec
 ESTABLISHED_MIN = 50      # this many records show an established population even where the winter test
 #                           says no: Ae. aegypti has "well-established populations" in Buenos Aires
 #                           (Díaz-Nieto et al. 2013, PLoS NTD, PMC3561174), whose coldest month averages ~9.5 °C,
-#                           below the 10 °C isotherm. ASSUMPTION (the number); SUPPORTED (records beat the rule)
+#                           below the 10 °C isotherm. assumption (the number); supported (records beat the rule)
 # Culex pipiens north of ~39°, Cx. quinquefasciatus south of ~36°, hybrids between (North America; Rutgers
 # Center for Vector Biology). Used only when GBIF has no records of either near the place.
 QUINQ_BELOW_LAT, PIPIENS_ABOVE_LAT = 36.0, 39.0

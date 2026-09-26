@@ -9,5 +9,3 @@ data/geonames/
 # local settings: DATABASE_URL holds a password
 .env
 
-# editor and tool settings
-.claude/

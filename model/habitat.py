@@ -18,7 +18,7 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 # class: (label, habitat weight 0..1, flush threshold mm/day)
 # weight = how likely the feature holds the still water Culex pipiens breeds in; ranked from the species'
 # habitat preference, values are assumptions. flush = daily rain that washes larvae out: small channels
-# flush easily; ponds and basins have volume and barely flush. Plan: ~10-15 mm/day, tunable.
+# flush easily; ponds and basins have volume and barely flush. Starting point ~10-15 mm/day, tunable.
 CLASSES = {
     "wastewater": ("wastewater basin",    1.00, 25),
     "stormwater": ("stormwater basin",    0.95, 25),

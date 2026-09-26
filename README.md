@@ -1,76 +1,147 @@
-# FHIR output
+# BiteCast
 
-`serialise.bundle(explanations)` turns `risk.explain()` dicts into one FHIR R4 `Bundle` of type
-`collection`. See `example_bundle.json` (built from two clearly fake inputs by `python -m fhir.serialise`).
-The API serves it at `/api/cities/{city}/fhir` as `application/fhir+json`.
+IEEE OneAquaHealth Global Hackathon 2026, **Track 6** (also Tracks 3 and 7).
 
-## What is emitted
+BiteCast shows which ditches, drains, ponds and neighbourhoods in a town are breeding biting mosquitoes
+tonight, and why. Search any town (or zoom into its streets), and every patch of water on the map is
+coloured by mosquito risk. Tap one and you get the score, the reason behind it in plain words, and what
+to do about it.
 
-- **Location**, one per water feature: id `<city>-<osmtype>-<osmid>`, OpenStreetMap identifier
-  (`https://www.openstreetmap.org` + `way/123`), `mode: instance`, WGS84 `position` from the feature's
-  anchor point, habitat class and city in `description`, `physicalType` = `area`.
-- **Observation**, one per feature and date: `valueQuantity` = the risk index 0-100 (UCUM annotation
-  `{index}`), one `component` per model factor (development, stagnation, habitat, exposure; each 0-1,
-  UCUM `1` = the dimensionless unity), `effectiveDateTime` = the day, `issued` = when the bundle was made,
-  `method` cites Loetti et al. 2011, and a note carrying the risk band and the plain-English explanation,
-  which ends "Modelled estimate, not a field measurement."
-- **`status`** is `final` only for a day whose weather is finished and archived. Today is `preliminary`
-  (its weather is still partly forecast and will change), and so is every forecast day.
-- Every entry has a `urn:uuid:` fullUrl (deterministic uuid5 of the resource id), and
-  `Observation.subject.reference` is the Location's fullUrl. A relative `Location/<id>` reference
-  only resolves inside a Bundle when fullUrls are RESTful server URLs
-  ([Bundle: resolving references](https://hl7.org/fhir/R4/bundle.html#references)); we have no server.
-  One Location is emitted per feature however many dates it appears on, because `bdl-7` requires unique
-  fullUrls within a bundle.
+It is a modelled estimate, not a field measurement. There is no trained model: every number comes from
+published lab data, the weather, and open maps, and can be checked against its source.
 
-## Why the subject is a Location
+## Why water
 
-A risk index for a ditch has no patient. R4 types `Observation.subject` as
-`Reference(Patient | Group | Device | Location)` and defines it as:
+Mosquitoes that carry West Nile virus and dengue breed in still water. A stream that keeps flowing
+flushes their larvae out; the same stream silted up, or a blocked drain, a stormwater basin or a bucket in a
+back yard, lets them grow. So the condition of a town's water decides where people get bitten, and that
+link is what the OneAquaHealth project studies in urban streams. BiteCast turns it into a map anyone can
+read, and a data feed a health department can use.
 
-> "The patient, or group of patients, location, or device this observation is about and into whose
-> record the observation is placed."
-> https://hl7.org/fhir/R4/observation-definitions.html#Observation.subject
+## How the score works
 
-(The battle plan also quoted the spec as covering tests on "products, substances, and environments".
-That sentence is not in the R4 Observation page — don't use it. The `subject` definition above is.)
+Each spot gets a score from 0 to 100, four factors multiplied together, so the weakest one caps it:
 
-`RiskAssessment` was considered. Its R4 subject is `Patient | Group` only, so it cannot take a Location
-directly; a Group with a `characteristic.valueReference` to the Location would be the conformant route.
-We kept Observation for every day and flag the future ones with `status: preliminary` — that is the only
-machine-readable marker that a forecast day is a prediction rather than a measurement. A consumer that
-needs predictions typed as such wants RiskAssessment; see "next version" in the main README.
+| Factor | What it is | Source |
+|---|---|---|
+| Mosquito growth | Warmth banked by the larvae, day by day, until adults emerge | Lab development curves for each species (below) and daily temperature |
+| Still water | Days since rain last flushed the larvae out | Daily rainfall; small channels flush at 10 mm a day, ponds at 25 mm |
+| Water type | How likely this water is to stand still | OpenStreetMap tags (ditch, drain, pond, basin, stream...) and satellite water |
+| People nearby | Homes, schools, parks and playgrounds within 300 m, or people counted by satellite | OpenStreetMap, Meta's population map |
 
-## Honest gaps
+Where winters are cold, the season ends when days drop below 12 hours and the weekly mean below 15 °C,
+because new females then overwinter instead of biting (Field et al. 2022).
 
-- **No standard code.** There is no LOINC or SNOMED CT code for a modelled mosquito-emergence risk
-  index, so `code` uses a local, namespaced system `https://bitecast.example/CodeSystem/vector-risk`,
-  one code per species since model v2 (`culex-pipiens-emergence-risk`,
-  `culex-quinquefasciatus-emergence-risk`, `aedes-aegypti-emergence-risk`,
-  `aedes-albopictus-emergence-risk`) plus `factor-*` for the components. Standardised
-  vector-surveillance codes are a gap. The CodeSystem resource itself is not published.
-- **Container breeders.** For an *Aedes* forecast the Location is the neighbourhood (a residential area,
-  school, park or playground), because the containers the species breeds in are not mapped; its
-  `description` says so.
-- **No category.** All R4 `observation-category` codes describe patient data (`survey` means an
-  assessment instrument such as Apgar), so none is used rather than a misleading one.
-- **No interpretation.** `ObservationInterpretation` codes are relative to a reference range, and the
-  risk bands are our own thresholds. The band goes in a note instead.
-- **No narrative.** No resource carries `text`, so a validator will raise the `dom-6` best-practice
-  warning ("A resource should have narrative") on every resource.
+**Which mosquito.** Each place gets the species that actually live there: those recorded within 250 km
+in GBIF, or those the local winter allows where the area has too few records to rule them out.
 
-## How to validate
+| Species | Breeds in | Development data |
+|---|---|---|
+| *Culex pipiens* (northern house mosquito, West Nile) | drains, ditches, ponds | Loetti, Schweigmann & Burroni 2011: 5.5 °C threshold, 199.5 degree-days from first-instar larva to adult, Brière limits 9.8–34.2 °C (females) |
+| *Culex quinquefasciatus* (southern house mosquito) | the same, no winter pause | Shocket et al. 2020, eLife |
+| *Aedes aegypti* (dengue mosquito) | buckets, tanks, tyres around homes | Mordecai et al. 2017, PLoS NTD |
+| *Aedes albopictus* (tiger mosquito) | the same | Mordecai et al. 2017 |
 
-Not validated by an external server here — nothing was sent anywhere. Either:
+No map shows buckets, so the container breeders are drawn on the neighbourhoods where people live, with
+rain filling the containers and evaporation emptying them.
 
-- Official HL7 validator (Java):
-  `java -jar validator_cli.jar fhir/example_bundle.json -version 4.0.1`
-  (download from https://github.com/hapifhir/org.hl7.fhir.core/releases).
-- Or POST the bundle to a FHIR R4 server's `Bundle/$validate`, e.g. the hackathon sandbox.
+Every coefficient, where it comes from and how sure we are of it is in [docs/SCIENCE.md](docs/SCIENCE.md).
 
-Expect two kinds of message, both by design: `dom-6` narrative warnings, and informational notes that
-`https://bitecast.example/CodeSystem/vector-risk` is an unknown code system.
+## Does it behave like real mosquitoes?
 
-`python -m fhir.serialise` runs a structural self-check (id patterns, `obs-7`, resolvable subjects,
-UCUM on every quantity, one Location per feature across dates). The bundle also parses cleanly with the
-`fhir.resources` R4B pydantic models, which check structure and types but not terminology bindings.
+Two checks run on every change (`python check.py`):
+
+- **Across latitude.** The season should start later and run weaker further north. Oslo's season totals
+  under half of Coimbra's and starts weeks later.
+  ![Cross-city validation](docs/cross_city_validation.png)
+- **Against real records.** The modelled season is compared, month by month, with real mosquito records
+  from GBIF near each place. Where there are enough records the seasons correlate at r = 0.72 on average;
+  real populations peak a few weeks after the model, because the model tracks breeding conditions and
+  populations take a few generations to build up.
+  ![Validation against GBIF records](docs/gbif_local_validation.png)
+
+Bite reports from people using the app are compared with what the model predicted for that spot and
+night, and the tally is shown on the map.
+
+## Data
+
+All free, no account needed at run time:
+
+- **Weather:** [Open-Meteo](https://open-meteo.com/) (history and 16-day forecast). If its free daily
+  allowance runs out, past weather for a new place comes from [NASA POWER](https://power.larc.nasa.gov/),
+  adjusted to Open-Meteo's recent days.
+- **Water and places:** [OpenStreetMap](https://www.openstreetmap.org/) via the public Overpass servers.
+- **Water nobody has mapped:** [JRC Global Surface Water](https://global-surface-water.appspot.com/)
+  (Pekel et al. 2016), which also says how many months a year each patch holds water.
+- **People:** Meta's [High Resolution Settlement Layer](https://dataforgood.facebook.com/dfg/tools/high-resolution-population-density-maps).
+- **Mosquito records:** [GBIF](https://www.gbif.org/).
+- **City list for pre-loading:** [GeoNames](https://www.geonames.org/). **Place search:** [Photon](https://photon.komoot.io/).
+- **Basemap:** [OpenFreeMap](https://openfreemap.org/), © OpenMapTiles, © OpenStreetMap contributors.
+
+A place is fetched the first time someone opens it and cached after that. About 140 cities, including the
+five OneAquaHealth study sites (Benevento, Coimbra, Ghent, Oslo, Toulouse), are pre-loaded in `data/`.
+
+## For health systems: FHIR
+
+Each forecast can be exported as a FHIR R4 Bundle: a `Location` for the water (or neighbourhood) and an
+`Observation` for the risk on a given day, with each factor as a component. There is no LOINC code for
+mosquito breeding risk, so the code is local and clearly namespaced. Details and the reasoning behind each
+choice: [fhir/README.md](fhir/README.md).
+
+`GET /api/cities/coimbra/fhir?limit=20` returns the 20 riskiest spots in Coimbra today.
+
+## Run it
+
+Python 3.13.
+
+```bash
+pip install -r requirements.txt
+uvicorn api:app --port 8000
+```
+
+Then open http://localhost:8000. The API is documented at `/docs`.
+
+- `python check.py` runs every self-check and an API test across all cached places.
+- `python preload.py --top 40` pre-loads the next 40 biggest cities not cached yet.
+- `python sat.py` fetches the satellite layers for any cached place that lacks them.
+
+Bite reports are stored in Postgres when `DATABASE_URL` is set (we use [Neon](https://neon.tech/)), and in a
+local SQLite file otherwise. Put `DATABASE_URL=...` in a `.env` file or the environment; `.env` is ignored
+by git.
+
+**Deploying.** `render.yaml` runs the app on Render's free tier. A weekly GitHub Action
+(`.github/workflows/data.yml`) refreshes the weather for every cached place, pre-loads more cities and
+commits the data, so nothing depends on anyone's computer being on.
+
+## Layout
+
+```
+api.py            HTTP API and the web app (app/)
+model/            degree days, stagnation, habitat and exposure, species, containers, risk
+fetch.py          weather and OpenStreetMap downloads
+sat.py            satellite water and population layers
+places.py         any point on earth: fetch once, cache, keep fresh (refresh.py)
+presence.py       GBIF records per place
+feedback.py       bite reports; treatments.py larvicide log for control teams
+fhir/             FHIR R4 export
+validate*.py      the cross-city and GBIF checks
+app/              the web app (MapLibre, no build step)
+data/             cached weather, maps, satellite layers and species records
+```
+
+## Limits
+
+- Air temperature stands in for water temperature, and flushing is all-or-nothing.
+- The development rates come from lab populations at constant temperatures.
+- Container breeders are drawn on neighbourhoods, because the containers themselves are not mapped.
+- OpenStreetMap coverage varies a lot. Satellites fill in open water larger than about 0.4 ha and
+  settlements, but not ditches and drains; small towns in parts of Africa, South America and South Asia
+  can look emptier than they are.
+- The index tracks breeding conditions, not mosquito numbers. Real populations peak a few weeks later.
+- A new place can take up to a minute to load the first time, because the public map servers are slow.
+- *Anopheles* (malaria) is not modelled.
+
+## Licence
+
+MIT. Data sources keep their own licences (ODbL for OpenStreetMap, CC BY 4.0 for GeoNames, JRC and Meta
+data, and the terms of Open-Meteo and GBIF).

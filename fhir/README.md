@@ -32,8 +32,8 @@ A risk index for a ditch has no patient. R4 types `Observation.subject` as
 > record the observation is placed."
 > https://hl7.org/fhir/R4/observation-definitions.html#Observation.subject
 
-(The battle plan also quoted the spec as covering tests on "products, substances, and environments".
-That sentence is not in the R4 Observation page — don't use it. The `subject` definition above is.)
+(The sentence sometimes quoted about tests on "products, substances, and environments" is not in the R4
+Observation page; the `subject` definition above is the one to rely on.)
 
 `RiskAssessment` was considered. Its R4 subject is `Patient | Group` only, so it cannot take a Location
 directly; a Group with a `characteristic.valueReference` to the Location would be the conformant route.

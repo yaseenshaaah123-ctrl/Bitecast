@@ -15,7 +15,7 @@ T0, TL = 9.8, 34.2  # °C  Briére lower / upper development thresholds, females
 # Only the curve's shape is used below, so the fitted 'a' cancels out.
 T_OPT = (4 * TL + 3 * T0 + np.sqrt(16 * TL**2 + 9 * T0**2 - 16 * T0 * TL)) / 10
 
-ADULT_DAYS = 21     # adults counted as biting for 21 days after emergence (plan: 14-21 d). Assumption.
+ADULT_DAYS = 21     # adults counted as biting for 21 days after emergence (literature: 14-21 d). Assumption.
 ADULT_TAU = 7.0     # days; daily adult survival e^(-1/7) ≈ 0.87. Assumption, see docs/SCIENCE.md.
 SEASON_START_MONTH = 3  # overwintered females resume egg-laying in spring; cold March banks few DD anyway
 # Autumn diapause: Field et al. 2022 (doi:10.1038/s42003-022-04276-x, US populations) found induction starts

@@ -1,4 +1,4 @@
-"""Cross-city sanity check — the plan's go/no-go.
+"""Cross-city sanity check: a go/no-go for the whole model.
 
 Oslo (60°N) must come out clearly lower and later than Benevento and Coimbra (40-41°N). This is not a
 validation against mosquito counts (we have none); it checks the model reproduces the known latitudinal

@@ -1,6 +1,7 @@
 # Render Blueprint: the free web service that serves BiteCast (render.com, no card needed).
 # The cached cities in data/ ship with the code; places searched later are fetched live. Render's free disk
-# resets on every deploy or restart, so those later places (and bite reports) do not survive one.
+# resets on every deploy or restart, so those later places are fetched again after one. Bite reports live in
+# Postgres (DATABASE_URL), so they survive.
 services:
   - type: web
     name: bitecast

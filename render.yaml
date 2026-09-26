@@ -6,6 +6,7 @@ services:
     name: bitecast
     runtime: python
     plan: free
+    region: singapore        # next to the Neon database
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/cities
@@ -13,3 +14,5 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.3
+      - key: DATABASE_URL        # the Neon connection string: paste it in Render, never commit it
+        sync: false

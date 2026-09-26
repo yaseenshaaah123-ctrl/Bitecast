@@ -99,5 +99,34 @@ old = centre[centre["date"] < pd.Timestamp(today - timedelta(days=30))]
 assert abs((old["tmean"] - old["tmean_om"]).mean()) < 0.3, "the POWER shift did not remove its 2 C offset"
 assert got.groupby("cell")["date"].apply(lambda s: s.diff().dropna().dt.days.eq(1).all()).all(), "gap"
 
+# and when Open-Meteo's forecast refuses as well: the coming days from MET Norway, still a complete record
+asked.clear()
+real_request = fetch.request_json
+
+
+def refuse_forecast(method, urls, params=None, **kw):
+    if "api.met.no" in urls[0]:
+        now = pd.Timestamp.now(tz="UTC").floor("h")
+        series = [{"time": (now + pd.Timedelta(hours=h)).isoformat().replace("+00:00", "Z"),
+                   "data": {"instant": {"details": {"air_temperature": 20.0 + (h % 24) / 4}},
+                            "next_1_hours": {"details": {"precipitation_amount": 0.5}}}} for h in range(0, 60)]
+        series += [{"time": (now + pd.Timedelta(hours=h)).isoformat().replace("+00:00", "Z"),
+                    "data": {"instant": {"details": {"air_temperature": 22.0}},
+                             "next_6_hours": {"details": {"precipitation_amount": 3.0, "air_temperature_max": 26.0,
+                                                          "air_temperature_min": 18.0}}}} for h in range(60, 216, 6)]
+        return {"properties": {"timeseries": series}}
+    if "open-meteo" in urls[0]:
+        raise RuntimeError("2 attempts failed (fake 429)")
+    return fake(method, urls, params=params, **kw)
+
+
+fetch.request_json = refuse_forecast
+(tmp / "weather" / "at_test.csv").unlink()
+fetch.fetch_weather("at_test", anywhere)
+got = pd.read_csv(tmp / "weather" / "at_test.csv", parse_dates=["date"])
+fc = got[(got["cell"] == 0) & (got["kind"] == "forecast")]
+assert len(fc) >= 7 and fc["precip"].sum() > 0 and not got.isna().any().any(), fc
+assert got.groupby("cell")["date"].apply(lambda s: s.diff().dropna().dt.days.eq(1).all()).all(), "gap"
+
 shutil.rmtree(tmp)
 print("ok")

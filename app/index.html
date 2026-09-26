@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.0/maplibre-gl.css">
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=40">
 </head>
 <body data-view="world">
 
@@ -49,12 +49,12 @@
     <section class="view" id="view-world">
       <p class="eyebrow first">Mosquito risk, street by street</p>
       <h1 class="w-title">Where will mosquitoes bite tonight?</h1>
-      <p class="w-lede">Search any town, or zoom into the streets anywhere on the map. BiteCast reads the weather, the water and the mosquitoes recorded nearby, and shows which ditches, drains and ponds are breeding biting mosquitoes, and why.</p>
+      <p class="w-lede">Search any town, or zoom in on any town on the map. BiteCast reads the weather, the water and the mosquitoes recorded nearby, and shows which ditches, drains and ponds are breeding biting mosquitoes, and why.</p>
       <h2 class="eyebrow" id="w-recent-h" hidden>Recently opened</h2>
       <div class="w-cities" id="w-recent"></div>
       <h2 class="eyebrow">Ready to open</h2>
       <div class="w-cities" id="w-all"></div>
-      <p class="note">Anywhere else: search it, or zoom into its streets. It loads the first time and opens instantly after that.</p>
+      <p class="note">Anywhere else: search it, or zoom in on it. It loads the first time and opens instantly after that.</p>
       <p class="p-foot">Modelled estimate, not a field measurement.</p>
     </section>
 
@@ -170,7 +170,7 @@
   <p class="gbif-note" id="gbif-local-note"></p>
 
   <h3>Any place on earth</h3>
-  <p>Search any town, use your location, or zoom into streets anywhere: BiteCast fetches that area's water, weather and mosquito records the first time and keeps them, so the next visit is instant. The model is checked most thoroughly on five river basins studied by the OneAquaHealth project, the places in the charts above.</p>
+  <p>Search any town, use your location, or zoom in on any town: BiteCast fetches that area's water, weather and mosquito records the first time and keeps them, so the next visit is instant. The model is checked most thoroughly on five river basins studied by the OneAquaHealth project, the places in the charts above.</p>
 
   <h3>Standards</h3>
   <p>Each forecast can be exported as a FHIR R4 <code>Observation</code> whose subject is a <code>Location</code>, the water feature itself. There is no LOINC code for mosquito emergence risk, so the code is local and clearly namespaced. Standard vector-surveillance codes are a gap.</p>
@@ -191,6 +191,6 @@
 </dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.0/maplibre-gl.js"></script>
-<script src="app.js?v=38"></script>
+<script src="app.js?v=40"></script>
 </body>
 </html>

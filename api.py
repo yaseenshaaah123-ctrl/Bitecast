@@ -125,6 +125,9 @@ async def guard(request: Request, call_next):
 def _city(city):
     if city not in CITIES and city not in ANYWHERE:
         raise HTTPException(404, f"unknown city '{city}'; try one of {sorted(CITIES)}, or /api/anywhere")
+    if city in ANYWHERE and not (places.habitat.DATA / "weather" / f"{city}.csv").exists():
+        raise HTTPException(503, "This place is still loading. Try again in a moment.",
+                            headers={"Retry-After": "10"})
     places.touch(city)   # keep the places people actually open current (refresh.py)
     refresh.kick(city)   # and if this one is behind, fetch it now rather than at the next round
     return city

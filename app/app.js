@@ -42,7 +42,7 @@ const PHOTON = "https://photon.komoot.io";
 const PLACE_LAYERS = ["city", "district", "locality"];   // towns, cities and their districts, not shops or streets
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const PHONE = matchMedia("(max-width: 899px)");
-const AUTO_ZOOM = 12.5;                     // close enough to see streets: load the area by itself
+const AUTO_ZOOM = 11;                       // a town fills the screen: load the area by itself
 const AUTO_WAIT = 900;                      // ms after the map stops moving
 const OPEN_SHARE = 0.8;                     // inside this share of a place's radius, it is the place you're looking at
 const PLACE_LABEL = { residential: "residential area", school: "school", park: "park", playground: "playground" };
@@ -993,14 +993,23 @@ async function lookAt(lat, lon, name, country, { move = true, auto = false } = {
   S.pending = { lat: Number(lat), lon: Number(lon) };
   setStatus(auto ? `Loading mosquito data for ${name || "this area"}…` : `Opening ${name || "this place"}…`, true);
   if (move) glideTo({ center: [Number(lon), Number(lat)], zoom: 12.5 });   // the data arrives while the map travels
+  // say what is happening while a new place is fetched, and never wait forever
+  const label = name || "this place", ctrl = new AbortController();
+  const steps = [setTimeout(() => setStatus(`Getting the weather and mosquito records for ${label}…`, true), 6000),
+                 setTimeout(() => setStatus(`Still working on ${label}. A new place can take up to a minute the first time.`, true), 25000),
+                 setTimeout(() => ctrl.abort(), 90000)];
   try {
     const place = await api(`/api/anywhere?lat=${lat}&lon=${lon}` + (name ? `&name=${encodeURIComponent(name)}` : "")
-                            + (country ? `&country=${encodeURIComponent(country)}` : ""));
+                            + (country ? `&country=${encodeURIComponent(country)}` : ""), { signal: ctrl.signal });
+    steps.forEach(clearTimeout);
     S.cities = [place, ...S.cities.filter((c) => c.key !== place.key)];
     await loadCity(place.key, null, null, null, { move });
   } catch (e) {
-    setStatus(`Couldn't open that place: ${e.message}`);
+    setStatus(e.name === "AbortError"
+      ? `${label} is taking too long right now. Try again in a minute, or open a place from the list.`
+      : `Couldn't open ${label}: ${e.message}`);
   } finally {
+    steps.forEach(clearTimeout);
     S.pending = null;
   }
 }
@@ -1008,11 +1017,11 @@ async function lookAt(lat, lon, name, country, { move = true, auto = false } = {
 // Zoomed in close enough to see streets, anywhere on earth: load the area by itself.
 let autoTimer = 0;
 map.on("moveend", () => { clearTimeout(autoTimer); autoTimer = setTimeout(autoLoad, AUTO_WAIT); });
-const ZOOM_HINT = "Zoom in to street level to load mosquito risk here.";
+const ZOOM_HINT = "Zoom in a little more to load mosquito risk here.";
 async function autoLoad() {
   const c = map.getCenter(), at = { lat: c.lat, lon: c.lng }, z = map.getZoom();
   const covered = S.cities.some((p) => distM(at, p) < p.radius_m * 1.5);
-  const hint = z >= 8 && z < AUTO_ZOOM && !covered && !S.loading && !S.pending;
+  const hint = z >= 7 && z < AUTO_ZOOM && !covered && !S.loading && !S.pending;
   if (hint) setStatus(ZOOM_HINT);
   else if ($("status").textContent === ZOOM_HINT) setStatus("");
   if (z < AUTO_ZOOM || S.loading || S.pending || document.hidden) return;

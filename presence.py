@@ -17,7 +17,7 @@ import requests
 from model import species as sp_
 
 DIR = Path(__file__).parent / "data" / "species"
-HEADERS = {"User-Agent": "BiteCast hackathon project (IEEE OneAquaHealth Hackathon 2026)"}
+HEADERS = {"User-Agent": "BiteCast/2.1 (+https://github.com/yaseenshaaah123-ctrl/Bitecast)"}
 GBIF = "https://api.gbif.org/v1/occurrence/search"
 FIRST_YEAR = 2000       # recent records only: ranges have shifted (Ae. albopictus reached Europe in 1979)
 MAX_AGE_DAYS = 30       # re-check monthly; records accumulate slowly

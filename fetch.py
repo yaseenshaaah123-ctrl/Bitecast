@@ -17,7 +17,7 @@ import requests
 from cities import CITIES, grid_points
 
 DATA = Path(__file__).parent / "data"
-HEADERS = {"User-Agent": "BiteCast hackathon project (IEEE OneAquaHealth Hackathon 2026)"}
+HEADERS = {"User-Agent": "BiteCast/2.1 (+https://github.com/yaseenshaaah123-ctrl/Bitecast)"}   # MET Norway asks for a contact
 
 ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
 FORECAST = "https://api.open-meteo.com/v1/forecast"
@@ -46,6 +46,8 @@ REFETCH_DAYS = 31
 # the fallback, shifted to match Open-Meteo's own last 14 days, which still arrive with the forecast.
 POWER = "https://power.larc.nasa.gov/api/temporal/daily/point"
 POWER_FALLBACK = True     # preload.py turns it off: a place cached ahead of time waits for the best weather
+# And if Open-Meteo's forecast refuses too, the coming days come from MET Norway (free, no key, ~9 days).
+MET = "https://api.met.no/weatherapi/locationforecast/2.0/complete"
 
 
 def start_for(c):
@@ -148,11 +150,19 @@ def fetch_weather(key, c, full=False):
     with ThreadPoolExecutor(max_workers=2) as ex:      # the two halves of the record, at the same time
         # a place looked up anywhere: someone is waiting, and NASA POWER stands behind, so don't sit out a
         # refusal (Open-Meteo's limit is per day; retrying for a minute won't lift it)
-        fa = ex.submit(request_json, "GET", [ARCHIVE], **({"attempts": 2, "backoff": 3} if anywhere else {}),
+        # someone is waiting: two quick tries of 15 s each, never minutes of patient retries
+        quick = {"attempts": 2, "backoff": 2, "timeout": 15} if anywhere else {}
+        fa = ex.submit(request_json, "GET", [ARCHIVE], **quick,
                        params={**base, "start_date": since.isoformat(), "end_date": today.isoformat()})
-        ff = ex.submit(request_json, "GET", [FORECAST], params={
+        ff = ex.submit(request_json, "GET", [FORECAST], **quick, params={
             **base, "past_days": PAST_DAYS, "forecast_days": FORECAST_DAYS})
-        forecasts = list(daily_frames(ff.result()))
+        try:
+            forecasts = list(daily_frames(ff.result()))
+        except RuntimeError as e:
+            if not fallback:
+                raise
+            print(f"  {key}: Open-Meteo forecast refused ({e}); forecast from MET Norway", flush=True)
+            forecasts = met_forecasts(pts)
         try:
             archives = list(daily_frames(fa.result()))
         except RuntimeError as e:
@@ -185,7 +195,8 @@ def fetch_weather(key, c, full=False):
             temps = ["tmean", "tmax", "tmin"]
             df[temps] = df[temps].ffill().bfill()
             df["precip"] = df["precip"].fillna(0)
-        assert len(df) >= (end - start).days - 1 and not df.isna().any().any()
+        assert (not df.isna().any().any() and df.index[0].date() == start and df.index[-1].date() >= today
+                and len(df) == (df.index[-1] - df.index[0]).days + 1), f"{key} cell {i}: incomplete record"
         df = df.round(1)
         df["cell"] = i
         df["kind"] = ["observed" if d.date() < today else "forecast" for d in df.index]
@@ -199,11 +210,42 @@ def fetch_weather(key, c, full=False):
     os.replace(tmp, out)
 
 
+def met_forecast(lat, lon):
+    """The coming ~9 days at a point from MET Norway, as daily tmean/tmax/tmin/precip. Its times are UTC;
+    local days are taken from the longitude (an hour per 15 degrees), close enough for daily sums."""
+    j = request_json("GET", [MET], attempts=2, backoff=2, timeout=15,
+                     params={"lat": round(lat, 4), "lon": round(lon, 4)})
+    shift = pd.Timedelta(hours=round(lon / 15))
+    rows = []
+    for t in j["properties"]["timeseries"]:
+        d = t["data"]
+        n1 = d.get("next_1_hours", {}).get("details", {})
+        n6 = d.get("next_6_hours", {}).get("details", {})
+        rows.append({"date": (pd.Timestamp(t["time"]).tz_convert(None) + shift).normalize(),
+                     "t": d["instant"]["details"].get("air_temperature"),
+                     "hi": n6.get("air_temperature_max"), "lo": n6.get("air_temperature_min"),
+                     # hourly steps carry the next hour's rain; later 6-hourly steps the next six hours'
+                     "rain": n1.get("precipitation_amount") if n1 else n6.get("precipitation_amount")})
+    df = pd.DataFrame(rows)
+    day = df.groupby("date").agg(tmean=("t", "mean"), t_hi=("t", "max"), t_lo=("t", "min"), hi=("hi", "max"),
+                                 lo=("lo", "min"), precip=("rain", "sum"), n=("t", "size"))
+    day = day[day["n"] >= 3]                                  # a day with one reading is not a day
+    out = pd.DataFrame({"tmean": day["tmean"], "tmax": day[["t_hi", "hi"]].max(axis=1),
+                        "tmin": day[["t_lo", "lo"]].min(axis=1), "precip": day["precip"]})
+    out.index.name = "time"
+    return out
+
+
+def met_forecasts(pts):
+    """One MET Norway forecast per grid cell (a few requests, a second or two in all)."""
+    return [met_forecast(lat, lon) for lat, lon in pts]
+
+
 def power_archives(pts, since, today, forecasts):
     """Past weather from NASA POWER, one frame per grid cell. One request (its ~50 km grid cell covers the
     whole place); each cell's temperatures are shifted by the mean difference from Open-Meteo's own past
     days for that cell, so the record doesn't jump where the two sources meet. Rain is used as it is."""
-    j = request_json("GET", [POWER], attempts=3, params={
+    j = request_json("GET", [POWER], attempts=2, backoff=2, timeout=20, params={
         "parameters": "T2M,T2M_MAX,T2M_MIN,PRECTOTCORR", "community": "AG", "format": "JSON",
         "latitude": pts[0][0], "longitude": pts[0][1], "time-standard": "LST",
         "start": since.strftime("%Y%m%d"), "end": today.strftime("%Y%m%d")})

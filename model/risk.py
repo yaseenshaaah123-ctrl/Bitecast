@@ -181,6 +181,7 @@ def _city_model(city):
     and forecast work, and the water appears when the map lands."""
     m = weather_model(city)
     ws = sp_.SPECIES[m["water_species"]]
+    mapped = (hb.DATA / "osm" / f"{city}.json").exists()   # False: only the satellite layers so far
     try:
         features = hb.load_features(city)
     except FileNotFoundError:
@@ -207,7 +208,7 @@ def _city_model(city):
         f["override"] = {"reset": reset, "banked": banked, "progress": progress, "development": adults,
                          "treated_mask": mask}
     return {**m, "features": features, "by_id": {f["id"]: f for f in features},
-            "homes": homes, "by_home": {h["id"]: h for h in homes}, "map_ready": True}
+            "homes": homes, "by_home": {h["id"]: h for h in homes}, "map_ready": mapped}
 
 
 city_model.cache_clear = _city_model.cache_clear

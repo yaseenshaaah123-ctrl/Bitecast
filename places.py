@@ -169,7 +169,10 @@ def map_state(key):
     """Where this place's map has got to: "ready", "loading", or "error" with the reason."""
     if (habitat.DATA / "osm" / f"{key}.json").exists():
         return {"stage": "ready"}
-    return MAP_STATE.get(key, {"stage": "ready" if key in CITIES else "missing"})
+    state = MAP_STATE.get(key, {"stage": "ready" if key in CITIES else "missing"})
+    if state.get("stage") == "loading" and (habitat.DATA / "sat" / f"{key}.json").exists():
+        state = {**state, "satellite": True}    # the satellite water and settlements can be shown already
+    return state
 
 
 def _load_map(key, place, weather_ready=None):
@@ -214,10 +217,11 @@ def _fetch_osm_adaptively(key, place):
     """Dense cities can time out the public Overpass servers. Shrink the area rather than give up:
     2 km of mapped water around you beats an error page."""
     last = None
-    for radius in (place["radius_m"], 2000, 1000):
+    # a busy server that hasn't answered the full area in a minute rarely does: ask for less, sooner
+    for radius, deadline in ((place["radius_m"], 60), (2000, 60), (1000, 90)):
         place["radius_m"] = radius
         try:
-            fetch.fetch_osm(key, place, qtimeout=60, use_bbox=True, hedged=True, deadline=100)
+            fetch.fetch_osm(key, place, qtimeout=55, use_bbox=True, hedged=True, deadline=deadline)
             return
         except Exception as e:
             last = e

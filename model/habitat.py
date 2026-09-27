@@ -116,6 +116,15 @@ def _geom(kind, coords, proj):
     return LineString(pts) if len(pts) >= 2 else None
 
 
+def _osm(city):
+    """The cached OSM data. While a new place's map is still downloading, an empty map if its satellite
+    layers are already here (the satellite water and settlements show first); otherwise FileNotFoundError."""
+    path = DATA / "osm" / f"{city}.json"
+    if not path.exists() and (DATA / "sat" / f"{city}.json").exists():
+        return {"water": [], "exposure": []}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def _sat(city):
     """The cached satellite layers for a place (sat.py), or None."""
     try:
@@ -152,7 +161,7 @@ def _exposure(g, nearby, people):
 
 def load_features(city):
     """Water features for a city with habitat weight and exposure. Returns a list of dicts."""
-    raw = json.loads((DATA / "osm" / f"{city}.json").read_text(encoding="utf-8"))
+    raw = _osm(city)
     c = place(city)
     proj = _projector(c["lat"], c["lon"])
     sat = _sat(city)
@@ -250,7 +259,7 @@ PLACE_LABEL = {"residential": "residential area", "school": "school", "park": "p
 def load_places(city):
     """Neighbourhood features for container-breeding species: same shape as load_features() rows, class
     "containers", exposure from the same formula as water features (this place plus its neighbours)."""
-    raw = json.loads((DATA / "osm" / f"{city}.json").read_text(encoding="utf-8"))
+    raw = _osm(city)
     c = place(city)
     proj = _projector(c["lat"], c["lon"])
     kx, ky = 111_320 * math.cos(math.radians(c["lat"])), 110_540

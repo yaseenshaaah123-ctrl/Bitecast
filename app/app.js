@@ -368,7 +368,10 @@ function waitForMap(key) {
   clearTimeout(mapPoll);
   const token = S.token, name = S.place?.name || "this place";
   const t0 = Date.now(), what = S.season?.breeds === "containers" ? "homes and neighbourhoods" : "water";
-  const say = () => setStatus(Date.now() - t0 < 12000 ? `Mapping the ${what} around ${name}…`
+  const early = S.items.length > 0;               // the satellite layers are on the map already
+  const say = () => setStatus(early
+    ? `Showing what satellites see around ${name}; adding the mapped streams and drains…`
+    : Date.now() - t0 < 12000 ? `Mapping the ${what} around ${name}…`
     : `Mapping the ${what} around ${name}. The first visit to a new place can take up to a minute; after that it opens instantly.`, true);
   say();
   const clock = setInterval(() => (token === S.token && $("status").classList.contains("busy") ? say() : clearInterval(clock)), 1000);
@@ -384,7 +387,12 @@ function waitForMap(key) {
     if (p?.map?.stage === "error") {
       clearInterval(clock);
       console.warn("map unavailable:", p.map.error);
-      return setStatus(`Couldn't map the ${what} around ${name} right now. Try again in a minute.`);
+      return setStatus(early ? `Showing water seen by satellite around ${name}; the street map couldn't be fetched right now.`
+                             : `Couldn't map the ${what} around ${name} right now. Try again in a minute.`);
+    }
+    if (p?.map?.satellite && !early) {            // satellite layers in: show them now, keep waiting for the map
+      clearInterval(clock);
+      return loadCity(key, S.season.dates[S.day], null, S.species, { move: false });
     }
     mapPoll = setTimeout(tick, 2500);
   };

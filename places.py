@@ -14,6 +14,7 @@ import threading
 import time
 
 import fetch
+import placestore
 import presence
 from cities import ANYWHERE, ANYWHERE_RADIUS_M, CITIES, REFERENCE
 from model import habitat, risk
@@ -142,6 +143,8 @@ def ensure(lat, lon, name=None, country=None, wait_for_map=True):
                         need_species = False
             finally:
                 weather_ready.set()
+            if not need_map:                        # its map was already here: keep the new weather too
+                threading.Thread(target=placestore.save, args=(key,), daemon=True).start()
             if need_map and wait_for_map:
                 _load_map(key, place, weather_ready)   # raises if the map cannot be fetched
         if need_species:
@@ -186,6 +189,9 @@ def _load_map(key, place, weather_ready=None):
         risk.weather_model.cache_clear()          # before saying "ready": the next request must see the water
         risk.city_model.cache_clear()
         MAP_STATE[key] = {"stage": "ready"}
+        if weather_ready:
+            weather_ready.wait(120)
+        placestore.save(key)                      # so a restart of the server doesn't lose it (Postgres)
     except Exception as e:
         MAP_STATE[key] = {"stage": "error", "error": str(e)}
         print(f"  {key}: map unavailable ({e})", flush=True)
@@ -256,4 +262,5 @@ def summary(key):
             "model_version": risk.MODEL_VERSION}
 
 
+placestore.restore_missing()   # places looked up before the last restart of a free host (Postgres)
 restore()  # pick up anything cached by an earlier run

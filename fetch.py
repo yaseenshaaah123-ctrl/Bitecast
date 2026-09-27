@@ -161,29 +161,36 @@ def fetch_weather(key, c, full=False):
     base = {"latitude": ",".join(str(p[0]) for p in pts), "longitude": ",".join(str(p[1]) for p in pts),
             "daily": ",".join(DAILY), "timezone": "auto"}
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=2) as ex:      # the two halves of the record, at the same time
-        # a place looked up anywhere: someone is waiting, and NASA POWER stands behind, so don't sit out a
-        # refusal (Open-Meteo's limit is per day; retrying for a minute won't lift it)
-        # someone is waiting: two quick tries of 15 s each, never minutes of patient retries
-        quick = {"attempts": 2, "backoff": 2, "timeout": 15} if anywhere else {}
-        fa = ex.submit(request_json, "GET", [ARCHIVE], **quick,
-                       params={**base, "start_date": since.isoformat(), "end_date": today.isoformat()})
-        ff = ex.submit(request_json, "GET", [FORECAST], **quick, params={
-            **base, "past_days": PAST_DAYS, "forecast_days": FORECAST_DAYS})
+    # someone is waiting on a place looked up anywhere: two quick tries of 15 s each, never minutes of
+    # patient retries (Open-Meteo's limit is per day; retrying won't lift it), with the fallbacks behind
+    quick = {"attempts": 2, "backoff": 2, "timeout": 15} if anywhere else {}
+
+    def the_forecast():
         try:
-            forecasts = list(daily_frames(ff.result()))
+            return list(daily_frames(request_json("GET", [FORECAST], **quick, params={
+                **base, "past_days": PAST_DAYS, "forecast_days": FORECAST_DAYS}))), False
         except RuntimeError as e:
             if not fallback:
                 raise
             print(f"  {key}: Open-Meteo forecast refused ({e}); forecast from MET Norway", flush=True)
-            forecasts = met_forecasts(pts)
+            return met_forecasts(pts), True
+
+    def the_history():
         try:
-            archives = list(daily_frames(fa.result()))
+            return list(daily_frames(request_json("GET", [ARCHIVE], **quick, params={
+                **base, "start_date": since.isoformat(), "end_date": today.isoformat()}))), None
         except RuntimeError as e:
             if not fallback:
                 raise
             print(f"  {key}: Open-Meteo archive refused ({e}); past weather from NASA POWER", flush=True)
-            archives = power_archives(pts, since, today, forecasts)
+            return None, power_history(pts, since, today)
+
+    with ThreadPoolExecutor(max_workers=2) as ex:      # the two halves of the record, fallbacks included, at once
+        ff, fa = ex.submit(the_forecast), ex.submit(the_history)
+        forecasts, _ = ff.result()
+        archives, power = fa.result()
+    if archives is None:                               # NASA POWER, shifted onto Open-Meteo's past days if any
+        archives = power_archives(power, today, forecasts)
     assert len(archives) == len(forecasts) == len(pts), (len(archives), len(forecasts), len(pts))
 
     cells, last = [], None
@@ -251,14 +258,14 @@ def met_forecast(lat, lon):
 
 
 def met_forecasts(pts):
-    """One MET Norway forecast per grid cell (a few requests, a second or two in all)."""
-    return [met_forecast(lat, lon) for lat, lon in pts]
+    """One MET Norway forecast per grid cell, all asked at once (about a second in all)."""
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=len(pts)) as ex:
+        return list(ex.map(lambda p: met_forecast(*p), pts))
 
 
-def power_archives(pts, since, today, forecasts):
-    """Past weather from NASA POWER, one frame per grid cell. One request (its ~50 km grid cell covers the
-    whole place); each cell's temperatures are shifted by the mean difference from Open-Meteo's own past
-    days for that cell, so the record doesn't jump where the two sources meet. Rain is used as it is."""
+def power_history(pts, since, today):
+    """Past weather from NASA POWER: one request, since its ~50 km grid cell covers the whole place."""
     j = request_json("GET", [POWER], attempts=2, backoff=2, timeout=20, params={
         "parameters": "T2M,T2M_MAX,T2M_MIN,PRECTOTCORR", "community": "AG", "format": "JSON",
         "latitude": pts[0][0], "longitude": pts[0][1], "time-standard": "LST",
@@ -266,7 +273,13 @@ def power_archives(pts, since, today, forecasts):
     p = pd.DataFrame(j["properties"]["parameter"]).rename(
         columns={"T2M": "tmean", "T2M_MAX": "tmax", "T2M_MIN": "tmin", "PRECTOTCORR": "precip"})
     p.index = pd.to_datetime(p.index, format="%Y%m%d")
-    p = p.where(p > -900).dropna(how="all")          # -999 = not yet available
+    return p.where(p > -900).dropna(how="all")       # -999 = not yet available
+
+
+def power_archives(p, today, forecasts):
+    """NASA POWER's record as one frame per grid cell, each cell's temperatures shifted by the mean difference
+    from Open-Meteo's own past days for that cell (when the forecast came from Open-Meteo), so the record
+    doesn't jump where the two sources meet. Rain is used as it is."""
     out = []
     for fc in forecasts:
         past = fc[fc.index < pd.Timestamp(today)]

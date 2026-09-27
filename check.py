@@ -13,7 +13,7 @@ ENV = {**os.environ, "PYTHONIOENCODING": "utf-8"}
 SELF_CHECKS = [
     ["-m", "model.degree_days"], ["-m", "model.stagnation"], ["-m", "model.habitat"],
     ["-m", "model.species"], ["-m", "model.containers"],
-    ["-m", "fhir.serialise"], ["feedback.py"], ["treatments.py"], ["validate.py"], ["check_weather.py"],
+    ["-m", "fhir.serialise"], ["feedback.py"], ["treatments.py"], ["validate.py"], ["check_weather.py"], ["placestore.py"],
 ]
 
 

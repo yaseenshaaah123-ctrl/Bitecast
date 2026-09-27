@@ -95,6 +95,8 @@ def refresh_once(keys=None, force=False):
             if force or weather_stale(key):
                 fetch.fetch_weather(key, c)
                 done.append(f"{key}:weather")
+                import placestore
+                placestore.save(key, ("weather",))   # a place kept in Postgres keeps its fresh weather too
             if force or (osm_age_days(key) or 1e9) > OSM_MAX_AGE_DAYS:
                 fetch.fetch_osm(key, c, **({"use_bbox": True} if c.get("anywhere") else {}))
                 done.append(f"{key}:osm")

@@ -160,8 +160,19 @@ def weather_model(city):
     }
 
 
-@lru_cache(maxsize=16)
 def city_model(city):
+    """The cached model for a place. A model built while the map was still downloading has no water; if the
+    map has landed since (a slow request can finish after the map arrived and re-cache the empty model),
+    it is rebuilt now rather than served empty."""
+    m = _city_model(city)
+    if not m["map_ready"] and (hb.DATA / "osm" / f"{city}.json").exists():
+        _city_model.cache_clear()
+        m = _city_model(city)
+    return m
+
+
+@lru_cache(maxsize=16)
+def _city_model(city):
     """Weather model + features: water for the water breeder, neighbourhoods for any container breeder.
     A feature treated with larvicide gets its own development series: its larvae die on the treatment day,
     exactly like a flush, and the clock restarts.
@@ -197,6 +208,9 @@ def city_model(city):
                          "treated_mask": mask}
     return {**m, "features": features, "by_id": {f["id"]: f for f in features},
             "homes": homes, "by_home": {h["id"]: h for h in homes}, "map_ready": True}
+
+
+city_model.cache_clear = _city_model.cache_clear
 
 
 def resolve(m, species):

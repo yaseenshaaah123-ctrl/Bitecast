@@ -1185,8 +1185,16 @@ async function init() {
   await mapReady;
   addLayers();
   const p = new URLSearchParams(location.hash.slice(1));
-  try { S.cities = await api("/api/cities"); }
-  catch (e) { setStatus(`Couldn't reach the BiteCast server: ${e.message}. Reload to retry.`); return; }
+  // a free server that was asleep can take a while to answer its first request: keep asking, and say so
+  for (let tries = 1; ; tries++) {
+    try { S.cities = await api("/api/cities"); break; }
+    catch (e) {
+      if (tries >= 12) { setStatus(`Couldn't reach the BiteCast server: ${e.message}. Reload to retry.`); return; }
+      setStatus("Waking up the server… this takes up to a minute after a quiet spell.", true);
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
+  setStatus("");
   // A shared link opens its place; reloading the page starts again on the world, as it looks.
   const reloaded = performance.getEntriesByType?.("navigation")?.[0]?.type === "reload";
   if (reloaded) history.replaceState(null, "", location.pathname);

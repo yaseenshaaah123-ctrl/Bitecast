@@ -25,7 +25,7 @@
   --bar-h: 56px;
   --gap: 16px;
   --panel-w: 372px;
-  --left: calc(var(--panel-w) + 2 * var(--gap));     /* where the map area starts, right of the panel */
+  --left: calc(var(--panel-w) + var(--gap));         /* the panel, plus the gap before floating things on the map */
 }
 
 * { box-sizing: border-box; }
@@ -108,9 +108,9 @@ a { color: var(--accent); }
 
 /* ---------- the panel: left on a desktop, a bottom sheet on a phone ---------- */
 .panel {
-  position: fixed; z-index: 20; left: var(--gap); top: calc(var(--bar-h) + var(--gap)); bottom: var(--gap);
+  position: fixed; z-index: 20; left: 0; top: var(--bar-h); bottom: 0;   /* a sidebar: nothing shows behind it */
   width: var(--panel-w); display: flex; flex-direction: column; overflow: hidden;
-  background: var(--panel); border-radius: 16px; box-shadow: var(--shadow);
+  background: var(--panel); border-right: 1px solid var(--rule);
 }
 .grab { display: none; }
 .panel-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 22px 22px 20px; }
@@ -280,7 +280,7 @@ dialog.paper code { font: 13px var(--mono); background: var(--panel-2); padding:
 
   .panel {
     left: 0; right: 0; top: auto; bottom: 0; width: auto; height: var(--sheet, 180px);
-    border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 18px 18px 0 0; border-right: 0; box-shadow: var(--shadow); padding-bottom: env(safe-area-inset-bottom);
     transition: height .28s cubic-bezier(.2, .8, .2, 1);
   }
   .panel.dragging { transition: none; }

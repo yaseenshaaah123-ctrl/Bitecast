@@ -968,12 +968,13 @@ async function lookAt(lat, lon, name, country, { move = true, auto = false } = {
 let autoTimer = 0;
 map.on("moveend", () => { clearTimeout(autoTimer); autoTimer = setTimeout(autoLoad, AUTO_WAIT); });
 const ZOOM_HINT = "Zoom in a little more to load mosquito risk here.";
+const MAPPED_NOTE = "BiteCast has mapped";
 async function autoLoad() {
   const c = map.getCenter(), at = { lat: c.lat, lon: c.lng }, z = map.getZoom();
   const covered = S.cities.some((p) => distM(at, p) < p.radius_m * 1.5);
   const hint = z >= 7 && z < AUTO_ZOOM && !covered && !S.loading && !S.pending;
   if (hint) setStatus(ZOOM_HINT);
-  else if ($("status").textContent === ZOOM_HINT) setStatus("");
+  else if ($("status").textContent === ZOOM_HINT || $("status").textContent.startsWith(MAPPED_NOTE)) setStatus("");
   if (z < AUTO_ZOOM || S.loading || S.pending || document.hidden) return;
   if (S.place && distM(at, S.place) < S.place.radius_m * OPEN_SHARE) return;   // already looking at it
   const near = S.cities.filter((p) => distM(at, p) < p.radius_m * OPEN_SHARE).sort((a, b) => distM(at, a) - distM(at, b))[0];
@@ -982,6 +983,13 @@ async function autoLoad() {
   const hit = await whereIs(at.lat.toFixed(4), at.lon.toFixed(4));
   S.pending = null;
   if (map.getZoom() < AUTO_ZOOM || distM(at, { lat: map.getCenter().lat, lon: map.getCenter().lng }) > 1500) return;  // moved on
+  // A big city is mapped only near its centre: zooming into its outskirts is still that city, not a new search
+  const same = S.cities.filter((p) => sameTown(p, hit) && distM(at, p) < 25000).sort((a, b) => distM(at, a) - distM(at, b))[0];
+  if (same) {
+    if (same.key !== S.city) await loadCity(same.key, S.season?.dates[S.day], null, null, { move: false });
+    if (S.place?.radius_m) setStatus(`${MAPPED_NOTE} ${S.place.name} within ${Math.round(S.place.radius_m / 1000)} km of its centre.`);
+    return;
+  }
   lookAt(hit.lat, hit.lon, hit.name, hit.country, { move: false, auto: true });
 }
 

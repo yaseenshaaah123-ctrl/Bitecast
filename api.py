@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -229,7 +229,8 @@ def fhir(city: str, date: Optional[str] = None, feature: Optional[str] = None,
     else:
         ranked = _call(risk.scores, _city(city), date, species)[:limit]
         explained = [_call(risk.explain, city, f["id"], date, 0, species) for _, f in ranked]
-    return JSONResponse(bundle(explained), media_type="application/fhir+json")
+    # indented: people open this link in a browser too, and gzip makes the spaces nearly free
+    return Response(json.dumps(bundle(explained), indent=2, ensure_ascii=False), media_type="application/fhir+json")
 
 
 @app.get("/api/status")

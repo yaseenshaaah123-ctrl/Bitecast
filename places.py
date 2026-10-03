@@ -154,14 +154,12 @@ def ensure(lat, lon, name=None, country=None, wait_for_map=True):
                 print(f"  {key}: GBIF species counts unavailable ({e}); choosing species from climate", flush=True)
             else:
                 if known:                           # its model may have been built from the climate alone
-                    risk.weather_model.cache_clear()
-                    risk.city_model.cache_clear()
+                    risk.forget(key)
         touch(key)                                  # opened now: worth keeping current for a few days
         if len(ANYWHERE) > MAX_PLACES:              # keep memory bounded; the disk cache survives
             for stale in list(ANYWHERE)[:-MAX_PLACES]:
                 ANYWHERE.pop(stale, None)
-                risk.weather_model.cache_clear()
-                risk.city_model.cache_clear()
+                risk.forget(stale)
     return key
 
 
@@ -189,8 +187,7 @@ def _load_map(key, place, weather_ready=None):
             if weather_ready:
                 weather_ready.wait(300)
             fetch.fetch_weather(key, place, full=True)
-        risk.weather_model.cache_clear()          # before saying "ready": the next request must see the water
-        risk.city_model.cache_clear()
+        risk.forget(key)                          # before saying "ready": the next request must see the water
         MAP_STATE[key] = {"stage": "ready"}
         if weather_ready:
             weather_ready.wait(120)
@@ -200,15 +197,14 @@ def _load_map(key, place, weather_ready=None):
         print(f"  {key}: map unavailable ({e})", flush=True)
         raise
     finally:
-        risk.weather_model.cache_clear()          # rebuild with the features (or without them, on failure)
-        risk.city_model.cache_clear()
+        risk.forget(key)                          # rebuild with the features (or without them, on failure)
 
 
 def _fetch_sat(key, place):
     try:
         import sat
         sat.fetch(key, place)
-        risk.city_model.cache_clear()          # if it lands after the map, the next request picks it up
+        risk.forget(key)                       # if it lands after the map, the next request picks it up
     except Exception as e:
         print(f"  {key}: satellite layers unavailable ({e})", flush=True)
 

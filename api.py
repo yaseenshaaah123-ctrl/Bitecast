@@ -3,6 +3,7 @@
     uvicorn api:app --reload        # from the bitecast/ directory, then open http://127.0.0.1:8000
 """
 import hashlib
+import json
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -32,8 +33,17 @@ from model import risk
 async def lifespan(app):
     """Keep the cached weather current while the server runs, so an opened app is never days behind."""
     task = asyncio.create_task(refresh.loop())
+    asyncio.create_task(asyncio.to_thread(_warm))   # the research cities ready before anyone clicks
     yield
     task.cancel()
+
+
+def _warm():
+    for key in CITIES:
+        try:
+            risk.city_model(key)
+        except Exception as e:
+            print(f"  {key}: warm-up failed ({e})", flush=True)
 
 
 app = FastAPI(title="BiteCast", lifespan=lifespan,
@@ -233,7 +243,16 @@ def validation():
     s = validate.summary()
     return {"cities": s, "failures": validate.check(s), "habitat": validate.HABITAT,
             "gbif": validate_gbif.summary(),         # real Culex pipiens records, national, committed cache
-            "gbif_local": validate_gbif.local_summary()}   # every modelled species, records within 250 km
+            "gbif_local": validate_gbif.local_summary(),   # every modelled species, records within 250 km
+            "learned": _learned_summary()}                 # the machine-learning cross-check (learn.py)
+
+
+def _learned_summary():
+    try:
+        s = json.loads((Path(__file__).parent / "data" / "validation" / "learned.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return {k: v for k, v in s.items() if k != "rows"}
 
 
 class Report(BaseModel):
@@ -315,7 +334,7 @@ def add_treatment(t: Treatment, x_treatment_token: Optional[str] = Header(None))
     if t.feature_id not in risk.city_model(t.city)["by_id"]:
         raise HTTPException(404, f"unknown feature '{t.feature_id}' in {t.city}")
     saved = _call(treatments.add, t.city, t.feature_id, t.date, t.product, t.note)
-    risk.city_model.cache_clear()   # the treated feature's series changes
+    risk.forget(t.city)   # the treated feature's series changes
     return saved
 
 

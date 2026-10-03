@@ -10,9 +10,11 @@ are scored on the mapped water, with stagnation = days since a flushing rain. Co
 are scored on the mapped neighbourhoods, with stagnation = the share of containers holding water. Culex
 pipiens runs exactly the v1 model (Loetti 2011), so the research cities' scores are unchanged.
 """
+import threading
 import zlib
+from collections import OrderedDict
 from datetime import date as Date
-from functools import lru_cache
+from functools import wraps
 
 import numpy as np
 import pandas as pd
@@ -23,6 +25,7 @@ from cities import grid_points, place
 from model import containers as ct
 from model import degree_days as dd_
 from model import habitat as hb
+from model import learned as ml_
 from model import species as sp_
 from model import stagnation as st
 
@@ -83,6 +86,50 @@ def band(risk):
     return next(name for top, name in BANDS if risk < top)
 
 
+# ---------------------------------------------------------------- per-place model cache
+
+def _per_place(maxsize):
+    """lru_cache for one-argument functions of a place, but one place can be forgotten on its own.
+    (lru_cache can only clear everything: one town's weather refresh used to make every other town
+    rebuild its model on the next click, about 12 s each on the free server.)"""
+    def deco(fn):
+        cache, lock = OrderedDict(), threading.Lock()
+
+        @wraps(fn)
+        def cached(key):
+            with lock:
+                if key in cache:
+                    cache.move_to_end(key)
+                    return cache[key]
+            value = fn(key)
+            with lock:
+                cache[key] = value
+                while len(cache) > maxsize:
+                    cache.popitem(last=False)
+            return value
+
+        def cache_clear(key=None):
+            with lock:
+                cache.clear() if key is None else cache.pop(key, None)
+
+        cached.cache_clear, cached.cached = cache_clear, lambda key: key in cache
+        return cached
+    return deco
+
+
+def forget(key, rebuild=False):
+    """Drop one place's cached models after its files changed. With rebuild, a place that was in memory is
+    built again right away (call it from a background thread), so the next visitor doesn't wait."""
+    was = _city_model.cached(key)
+    weather_model.cache_clear(key)
+    _city_model.cache_clear(key)
+    if rebuild and was:
+        try:
+            city_model(key)
+        except Exception as e:
+            print(f"  {key}: model rebuild failed ({e})", flush=True)
+
+
 # ---------------------------------------------------------------- the temporal half
 
 def _temporal(sp, dates, w, lat, doy):
@@ -120,7 +167,7 @@ def _temporal(sp, dates, w, lat, doy):
     return {"classes": classes, "drivers": drivers}
 
 
-@lru_cache(maxsize=16)   # a few recent places in memory; the free server has 512 MB
+@_per_place(16)   # a few recent places in memory; the free server has 512 MB
 def weather_model(city):
     """The temporal half, per weather cell and per species modelled here.
 
@@ -166,12 +213,12 @@ def city_model(city):
     it is rebuilt now rather than served empty."""
     m = _city_model(city)
     if not m["map_ready"] and (hb.DATA / "osm" / f"{city}.json").exists():
-        _city_model.cache_clear()
+        _city_model.cache_clear(city)
         m = _city_model(city)
     return m
 
 
-@lru_cache(maxsize=16)
+@_per_place(16)
 def _city_model(city):
     """Weather model + features: water for the water breeder, neighbourhoods for any container breeder.
     A feature treated with larvicide gets its own development series: its larvae die on the treatment day,
@@ -312,7 +359,18 @@ def season(city, species=None):
         "breeds": sp.breeds, "species_list": m["species"], "species_evidence": m["evidence"],
         "map_ready": m["map_ready"], "classes": classes, "temporal": temporal,
         "strip": r5(centre["development"] * centre["stagnation"]),   # the season curve: centre, still water
+        "learned": _learned(m, sk, centre),
     }
+
+
+def _learned(m, sk, centre):
+    """The season by calendar month from the learned model (model/learned.py), beside the lab-based one.
+    A cross-check shown with the chart: it never changes a score. None if it can't be computed."""
+    try:
+        out = ml_.months(m["weather"], m["lat"], sk, centre["development"] * centre["stagnation"])
+    except Exception:   # a check, not a dependency: never let it take the season down
+        return None
+    return out and {k: [round(float(x), 4) for x in v] for k, v in out.items()}
 
 
 def _emergence(m, v, i):

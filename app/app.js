@@ -23,6 +23,8 @@ const store = {
   get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
 };
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
+                     "October", "November", "December"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const FACTOR_NAMES = {
   development: ["Mosquito growth", "Development: warmth banked by the larvae"],
@@ -36,7 +38,6 @@ const VERDICT = {
   moderate: "Some biting mosquitoes likely around dusk.",
   low: "Few mosquitoes expected from this water.",
 };
-const REPORT_WINDOW_DAYS = 14;              // matches feedback.MAX_AGE_DAYS on the server
 // Place search: Photon (komoot), built on OpenStreetMap for search-as-you-type, which OSM's own Nominatim forbids.
 const PHOTON = "https://photon.komoot.io";
 const PLACE_LAYERS = ["city", "district", "locality"];   // towns, cities and their districts, not shops or streets
@@ -53,18 +54,8 @@ const STATUS_LABEL = {
   climate: "not recorded nearby; the climate allows it",
   introduced: "recorded, but winters here are too cold for it to settle",
 };
-// A random per-browser id so one person's second tap replaces their first instead of counting twice.
-const CLIENT = (() => {
-  try {
-    const k = "bitecast-client";
-    let v = localStorage.getItem(k);
-    if (!v) localStorage.setItem(k, (v = Math.random().toString(36).slice(2) + Date.now().toString(36)));
-    return v;
-  } catch { return null; }
-})();
-
 const $ = (id) => document.getElementById(id);
-const S = { cities: [], city: null, place: null, season: null, items: [], byFid: new Map(), reports: [],
+const S = { cities: [], city: null, place: null, season: null, items: [], byFid: new Map(),
             day: 0, year: 0, start: 0, end: 0, mode: "risk", selected: null, token: 0,
             daily: null, view: "world", sheet: "peek", pending: null, loading: false };
 
@@ -103,7 +94,6 @@ const dayDate = (iso) => fmtDate(iso, { weekday: "short", day: "numeric", month:
 const coord = (lat, lon) => `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? "N" : "S"} ${Math.abs(lon).toFixed(4)}°${lon >= 0 ? "E" : "W"}`;
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
-const daysBetween = (a, b) => Math.round((utc(b) - utc(a)) / 86400000);
 const band = (r) => (r < 25 ? "low" : r < 50 ? "moderate" : r < 75 ? "high" : "very high");
 function distM(a, b) {       // metres between {lat, lon} points; plenty accurate at city scale
   const k = Math.PI / 180, x = (b.lon - a.lon) * k * Math.cos(((a.lat + b.lat) / 2) * k), y = (b.lat - a.lat) * k;
@@ -173,7 +163,7 @@ function styleBasemap() {
 function addLayers() {
   styleBasemap();
   const labels = map.getStyle().layers.find((l) => l.type === "symbol")?.id;   // keep street names on top
-  for (const id of ["feat", "dots", "reports", "places"]) map.addSource(id, { type: "geojson", data: EMPTY });
+  for (const id of ["feat", "dots", "places"]) map.addSource(id, { type: "geojson", data: EMPTY });
   const add = (layer, before = labels) => map.addLayer(layer, before);
   add({ id: "feat-fill", type: "fill", source: "feat", filter: IS_POLY,
         paint: { "fill-color": RAMP_EXPR, "fill-opacity": shapes(["interpolate", ["linear"], R, 0, 0.18, 100, 0.68]) } });
@@ -205,10 +195,6 @@ function addLayers() {
              "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, ["+", 1.5, ["*", ["sqrt", R], 0.35]],
                                11.6, ["+", 2.5, ["*", ["sqrt", R], 1.1]]],
              "circle-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0, 7, dotVis, 10.6, dotVis, 11.6, 0] } });
-  map.addLayer({ id: "reports", type: "circle", source: "reports",
-    paint: { "circle-radius": 6, "circle-stroke-width": 2,
-             "circle-color": ["case", ["get", "bitten"], C.ink, "#ffffff"],
-             "circle-stroke-color": ["case", ["get", "bitten"], "#ffffff", C.ink] } });
   map.addLayer({ id: "places", type: "circle", source: "places", maxzoom: 10,
     paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 4.5, 8, 7.5], "circle-stroke-width": 2,
              "circle-color": "#c83841", "circle-stroke-color": "#ffffff" } });
@@ -228,8 +214,6 @@ function addLayers() {
   }
   map.on("click", "places", (e) => { const k = e.features[0].properties.key; if (k) loadCity(k); });
   hover("places", (f) => f.properties.label);
-  map.on("click", "reports", (e) => { const it = S.byFid.get(e.features[0].properties.fid); if (it) select(it.i); });
-  hover("reports", (f) => `Bite reports: ${f.properties.bad} bitten, ${f.properties.fine} fine`);
 }
 
 function uiPadding() {
@@ -281,10 +265,9 @@ async function loadCity(key, date, fid, species, { move = true } = {}) {
   const known = S.cities.find((c) => c.key === key);
   setStatus(`Loading ${known?.name || "this place"}…`, true);
   const q = species ? `?species=${encodeURIComponent(species)}` : "";
-  let season, feats, reports;
+  let season, feats;
   try {
-    [season, feats, reports] = await Promise.all([
-      api(`/api/cities/${key}/season${q}`), api(`/api/cities/${key}/features${q}`), api(`/api/feedback?city=${key}`)]);
+    [season, feats] = await Promise.all([api(`/api/cities/${key}/season${q}`), api(`/api/cities/${key}/features${q}`)]);
   } catch (e) {
     S.loading = false;
     if (species && token === S.token) return loadCity(key, date, fid, null, { move });   // a species not modelled here
@@ -295,7 +278,7 @@ async function loadCity(key, date, fid, species, { move = true } = {}) {
   if (token !== S.token) return;                 // a newer click won
 
   const moved = key !== S.city || S.view === "world";
-  S.city = key; S.season = season; S.reports = reports; S.species = season.species;
+  S.city = key; S.season = season; S.species = season.species;
   S.place = { ...(known || {}), ...season, key };
   S.selected = null;
   store.set(RECENT, [key, ...store.get(RECENT, []).filter((k) => k !== key)].slice(0, 6));
@@ -317,7 +300,6 @@ async function loadCity(key, date, fid, species, { move = true } = {}) {
   drawPlaces();
   drawPlaceHeader();
   drawSpecies();
-  drawReports();
   showFreshness();
   showView("place");
   if (move && moved && !(fid && S.byFid.has(fid))) fitPlace(S.place);
@@ -615,6 +597,14 @@ function drawTimeline() {
                                                   rx: 1, fill: C.rain, opacity: wk.future ? 0.55 : 0.9 }));
   }
   svg.append(svgEl("line", { x1: 0, x2: W, y1: base + 0.5, y2: base + 0.5, stroke: C.rule, "stroke-width": 1 }));
+  const ml = S.season.learned?.hybrid;              // the learned season, month by month, scaled to its own peak
+  if (ml) {
+    const top = Math.max(...ml), mid = (m) => (Date.UTC(S.year, m, 15) - Date.UTC(S.year, 0, 1)) / 864e5;
+    const pts = ml.map((v, m) => [X(mid(m)), base - (v / top) * maxH * 0.95]);
+    const line = svgEl("path", { d: pts.map(([x, y], k) => `${k ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" "),
+      fill: "none", stroke: C.ink, "stroke-width": 1.6, "stroke-dasharray": "5 3", opacity: 0.75, "pointer-events": "none" });
+    svg.append(line);
+  }
   for (let m = 0; m < 12; m++) {                   // month names along the bottom
     const doy = Math.round((Date.UTC(S.year, m, 1) - Date.UTC(S.year, 0, 1)) / 864e5);
     if (PHONE.matches && m % 2) continue;
@@ -639,7 +629,8 @@ function drawTimeline() {
   $("tl-title").textContent = `Mosquito season in ${S.place.name}, ${S.year}`;
   $("tl-sub").textContent = `${SHORT_NAME[S.species] || cap(sp?.common || "mosquito")}`
     + ` · ${S.mode === "risk" ? "bite risk" : "breeding"} at the worst spots, week by week`;
-  $("tl-sum").textContent = summarise(weeks);
+  $("tl-sum").textContent = summarise(weeks)
+    + (ml ? ` Machine learning on real mosquito records puts the peak in ${MONTH_NAMES[ml.indexOf(Math.max(...ml))]}.` : "");
 }
 
 // Drag or tap anywhere on the chart to move the map through the year
@@ -719,30 +710,10 @@ function labelBody(e) {
   const p = S.place;
   const [lat, lon] = e.centroid;
   const text = e.text.replace(/^[^.]*\(\d+\/100\)\.\s*/, "").replace(/\s*Modelled estimate, not a field measurement\.$/, "");
-  const here = S.reports.filter((r) => r.feature_id === e.feature_id);
-  const bitten = here.filter((r) => r.bad).length;
-  const age = daysBetween(e.date, new Date().toISOString().slice(0, 10));
-  const canReport = e.kind !== "forecast" && age >= 0 && age <= REPORT_WINDOW_DAYS;
   const homes = e.breeds === "containers";
   const what = cap(homes && e.source !== "satellite" ? PLACE_LABEL[e.place_kind] || "neighbourhood" : e.cls_label);
   const names = e.factor_names || FACTOR_NAMES;
   const when = e.kind === "today" ? "today" : e.kind === "forecast" ? "forecast" : "past weather";
-  const note = h("p", { class: "d-note" }, here.length ? `Reports here: ${bitten} bitten, ${here.length - bitten} fine.`
-                                                       : "No reports here yet.",
-    h("small", {}, "We keep this spot, the date, your answer and a random ID from your browser. No name, no account, no location."));
-  const ask = canReport ? [
-    h("h3", { class: "eyebrow" }, homes ? `Bitten near here on ${shortDate(e.date)}?` : `Bitten near here on the evening of ${shortDate(e.date)}?`),
-    h("div", { class: "d-actions" },
-      h("button", { type: "button", class: "d-btn", onclick: (ev) => report(e, true, ev, note) }, "Yes, I was bitten"),
-      h("button", { type: "button", class: "d-btn", onclick: (ev) => report(e, false, ev, note) }, "No, it was fine")),
-    note,
-  ] : [
-    h("h3", { class: "eyebrow" }, "Bite reports"),
-    h("p", { class: "d-note" }, e.kind === "forecast" ? "You can report once the evening has happened."
-                                                      : `Reports are open for the last ${REPORT_WINDOW_DAYS} days.`),
-    h("div", { class: "d-actions" }, h("button", { type: "button", class: "d-btn", onclick: () => setYearAndDay(S.todayIdx) }, "Jump to today")),
-    note,
-  ];
   return [
     h("p", { class: "p-country" }, [p.name, p.country && countryName(p.country)].filter(Boolean).join(", ")),
     h("h2", { class: "d-name" }, e.name || `${what}, ${whereOf(e.centroid)}`),
@@ -770,7 +741,6 @@ function labelBody(e) {
     h("div", { class: "d-do" },
       h("p", {}, h("b", {}, "If you live nearby: "), e.actions.resident),
       h("p", {}, h("b", {}, homes ? "If you manage this area: " : "If you manage this water: "), e.actions.city)),
-    ...ask,
     h("p", { class: "d-foot" },
       e.species_name && h("span", {}, h("i", {}, e.species_name), ` (${e.species_common}) · `),
       `${coord(lat, lon)} · `,
@@ -787,53 +757,6 @@ function labelBody(e) {
 }
 
 function setYearAndDay(i) { setYear(Number(S.season.dates[i].slice(0, 4)), i); }
-
-async function report(e, bad, ev, note) {
-  const buttons = ev.target.parentElement.querySelectorAll("button");
-  buttons.forEach((b) => (b.disabled = true));
-  try {
-    await api("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ city: e.city, feature_id: e.feature_id, date: e.date, bad, client: CLIENT }) });
-    S.reports = await api(`/api/feedback?city=${e.city}`);
-    drawReports();
-    note.textContent = `Saved: ${bad ? "bitten" : "fine"} on ${shortDate(e.date)}. Thank you, this is how the model gets checked.`;
-  } catch (err) {
-    note.textContent = `Not saved: ${err.message}`;
-    buttons.forEach((b) => (b.disabled = false));
-  }
-}
-
-function drawReports() {
-  const byFeature = new Map();
-  for (const r of S.reports) {
-    const g = byFeature.get(r.feature_id) || { bad: 0, fine: 0 };
-    r.bad ? g.bad++ : g.fine++;
-    byFeature.set(r.feature_id, g);
-  }
-  const feats = [];
-  for (const [fid, g] of byFeature) {
-    const it = S.byFid.get(fid);
-    if (it) feats.push({ type: "Feature", properties: { fid, bitten: g.bad > 0, bad: g.bad, fine: g.fine },
-                         geometry: { type: "Point", coordinates: [it.p.centroid[1], it.p.centroid[0]] } });
-  }
-  map.getSource("reports")?.setData({ type: "FeatureCollection", features: feats });
-  const n = S.reports.length, bitten = S.reports.filter((r) => r.bad).length;
-  $("reports").textContent = n
-    ? `${plural(n, "report")} here: ${bitten} bitten, ${n - bitten} fine. Dark dots on the map mark bites, white ones quiet evenings.`
-    : "No reports here yet. Tap any spot on the map and say whether you were bitten there.";
-  drawScoreboard();
-}
-
-async function drawScoreboard() {
-  try {
-    const sb = await api(`/api/feedback/scoreboard?city=${S.city}`);
-    $("scoreboard").textContent = sb.reports
-      ? `The model agreed with ${sb.agree} of ${plural(sb.reports, "report")} (${Math.round(sb.agreement * 100)}%): `
-        + `${sb.likely_bitten} bites it expected, ${sb.unlikely_fine} quiet nights it expected, `
-        + `${sb.unlikely_bitten} missed, ${sb.likely_fine} false alarms.`
-      : "";
-  } catch { $("scoreboard").textContent = ""; }
-}
 
 async function showFreshness() {
   try {
@@ -931,6 +854,7 @@ function drawGbif(g) {
     + `Real records peak about ${g.mean_peak_lag_months} month(s) later than the model: the model tracks breeding `
     + "conditions, while real populations take several generations to build up, and surveys trap more in late summer.";
   drawGbifLocal(validation.gbif_local);
+  drawLearned(validation.learned);
 }
 
 function drawGbifLocal(g) {
@@ -947,6 +871,24 @@ function drawGbifLocal(g) {
   $("gbif-local-note").textContent =
     `Every species the map models, against real records near each place: r = ${g.mean_r_where_enough} on average `
     + `where there are at least ${g.min_records} records. * Lahore is a reference place kept only for this check.`;
+}
+
+function drawLearned(g) {
+  if (!g) return;
+  const NAME = { culex_pipiens: "Culex pipiens", culex_quinquefasciatus: "Culex quinquefasciatus",
+                 aedes_aegypti: "Aedes aegypti", aedes_albopictus: "Aedes albopictus" };
+  const r = (v) => `r = ${v.toFixed(2)}`;
+  $("learned-table").replaceChildren(
+    h("thead", {}, h("tr", {}, ["Mosquito", "Places", "Lab-based", "Machine learning", "Both averaged"].map((t) => h("th", {}, t)))),
+    h("tbody", {}, [...Object.entries(g.by_species).map(([k, v]) => h("tr", {},
+      h("td", {}, h("i", {}, NAME[k] || k)), h("td", { class: "n" }, String(v.n)),
+      h("td", { class: "n" }, r(v.mechanistic)), h("td", { class: "n" }, r(v.learned)), h("td", { class: "n" }, r(v.hybrid)))),
+      h("tr", {}, h("td", {}, h("b", {}, "All")), h("td", { class: "n" }, String(g.judged)),
+        h("td", { class: "n" }, r(g.mean_r_mechanistic)), h("td", { class: "n" }, r(g.mean_r_learned)),
+        h("td", { class: "n" }, h("b", {}, r(g.mean_r_hybrid))))]));
+  $("learned-note").textContent =
+    `Trained on ${g.records.toLocaleString()} dated records around ${g.places} places. Every score above is for places `
+    + "the model never saw: whole 10° blocks of the map are held out at a time. The dashed line on the season chart is the average of the two.";
 }
 
 function writeHash() {
@@ -986,7 +928,7 @@ function showWorld() {
   S.token++;
   if (S.selected != null) map.setFeatureState({ source: "feat", id: S.selected }, { sel: false });
   S.selected = null; S.season = null; S.city = null; S.place = null; S.items = []; S.byFid = new Map();
-  for (const src of ["feat", "dots", "reports"]) map.getSource(src)?.setData(EMPTY);
+  for (const src of ["feat", "dots"]) map.getSource(src)?.setData(EMPTY);
   drawRanks([]);
   showView("world");
   drawPlaces();

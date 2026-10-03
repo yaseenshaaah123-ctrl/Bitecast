@@ -106,9 +106,8 @@ def refresh_once(keys=None, force=False):
                 done.append(f"{key}:species")
         except Exception as e:                      # a public API having a bad hour is not fatal:
             failed.append(f"{key}: {e}")            # the previous cache stays, we try again next round
-    if done:
-        risk.weather_model.cache_clear()            # the model reads these files once and caches
-        risk.city_model.cache_clear()
+    for key in dict.fromkeys(d.split(":")[0] for d in done):
+        risk.forget(key, rebuild=True)              # only this place; rebuilt now if it was in use
     return {"refreshed": done, "failed": failed}
 
 

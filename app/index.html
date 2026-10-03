@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.0/maplibre-gl.css">
-<link rel="stylesheet" href="style.css?v=45">
+<link rel="stylesheet" href="style.css?v=46">
 </head>
 <body data-view="world">
 
@@ -84,10 +84,6 @@
         <div class="bands"><span>low</span><span>moderate</span><span>high</span><span>very high</span></div>
       </div>
 
-      <h2 class="eyebrow">Bite reports</h2>
-      <p class="note" id="reports"></p>
-      <p class="note" id="scoreboard"></p>
-
       <p class="p-foot">Modelled estimate, not a field measurement. <a class="linkish" id="fhir-place" href="#" target="_blank" rel="noopener">FHIR export for health systems</a></p>
     </section>
 
@@ -123,6 +119,7 @@
     <span><i style="background:var(--r3)"></i>high</span><span><i style="background:var(--r5)"></i>very high</span>
     <span><i class="hatch"></i>forecast</span><span><i class="unknown"></i>not known yet</span>
     <span><i style="background:var(--rain)"></i>rain</span>
+    <span><i class="ml"></i>season learned from real records</span>
   </div>
 </section>
 
@@ -168,14 +165,16 @@
   <table class="valid-table" id="gbif-local-table"></table>
   <p class="gbif-note" id="gbif-local-note"></p>
 
+  <h3>A machine-learning cross-check</h3>
+  <p>The lab-based model was never fitted to any place. So a second model learns the season from the field instead: a gradient-boosted tree model trained on real mosquito records, month by month, from the weather, the latitude, the species and the lab model's own index. It learns what the lab studies miss, like how long it takes real populations to build up. How well each matches the real season:</p>
+  <table class="valid-table" id="learned-table"></table>
+  <p class="gbif-note" id="learned-note"></p>
+
   <h3>Any place on earth</h3>
   <p>Search any town, use your location, or zoom in on any town: BiteCast fetches that area's water, weather and mosquito records the first time and keeps them, so the next visit is instant. The model is checked most thoroughly on five river basins studied by the OneAquaHealth project, the places in the charts above.</p>
 
   <h3>Standards</h3>
   <p>Each forecast can be exported as a FHIR R4 <code>Observation</code> whose subject is a <code>Location</code>, the water feature itself. There is no LOINC code for mosquito emergence risk, so the code is local and clearly namespaced. Standard vector-surveillance codes are a gap.</p>
-
-  <h3>Your reports and your privacy</h3>
-  <p>A report stores the water feature, the date, your yes or no, and a random ID your browser keeps so a second tap replaces the first. No name, no account, no location. Reports are compared with what the model predicted, and that comparison is shown on the map: it is how the model gets checked.</p>
 
   <h3>Limits</h3>
   <p>Air temperature stands in for water temperature. Flushing is all-or-nothing. The rates come from laboratory populations. Containers are not mapped, so container breeders are drawn on neighbourhoods, not on the buckets themselves.</p>
@@ -190,6 +189,6 @@
 </dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.0/maplibre-gl.js"></script>
-<script src="app.js?v=45"></script>
+<script src="app.js?v=47"></script>
 </body>
 </html>

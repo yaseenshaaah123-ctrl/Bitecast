@@ -1,6 +1,6 @@
 {
  "key": "coimbra",
- "fetched": "2026-09-22",
+ "fetched": "2026-10-23",
  "lat": 40.21,
  "lon": -8.42,
  "radius_km": 250,
@@ -9,7 +9,7 @@
  "counts": {
   "culex_pipiens": 194,
   "culex_quinquefasciatus": 0,
-  "aedes_aegypti": 0,
-  "aedes_albopictus": 345
+  "aedes_aegypti": 1,
+  "aedes_albopictus": 349
  }
 }

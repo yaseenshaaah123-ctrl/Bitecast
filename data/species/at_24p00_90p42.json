@@ -1,0 +1,15 @@
+{
+ "key": "at_24p00_90p42",
+ "fetched": "2026-11-14",
+ "lat": 24.0,
+ "lon": 90.42,
+ "radius_km": 250,
+ "years": "2000-2026",
+ "source": "GBIF occurrence search, occurrenceStatus=PRESENT, hasCoordinate",
+ "counts": {
+  "culex_pipiens": 13,
+  "culex_quinquefasciatus": 7,
+  "aedes_aegypti": 30,
+  "aedes_albopictus": 31
+ }
+}

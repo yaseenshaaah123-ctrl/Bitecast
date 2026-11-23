@@ -1,6 +1,6 @@
 {
  "key": "at_m34p60_m58p38",
- "fetched": "2026-10-23",
+ "fetched": "2026-11-23",
  "lat": -34.6,
  "lon": -58.38,
  "radius_km": 250,
@@ -9,7 +9,7 @@
  "counts": {
   "culex_pipiens": 0,
   "culex_quinquefasciatus": 0,
-  "aedes_aegypti": 108,
+  "aedes_aegypti": 109,
   "aedes_albopictus": 3
  }
 }

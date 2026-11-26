@@ -1,6 +1,6 @@
 {
  "key": "at_37p98_23p73",
- "fetched": "2026-10-26",
+ "fetched": "2026-11-26",
  "lat": 37.98,
  "lon": 23.73,
  "radius_km": 250,
@@ -10,6 +10,6 @@
   "culex_pipiens": 1278,
   "culex_quinquefasciatus": 0,
   "aedes_aegypti": 0,
-  "aedes_albopictus": 605
+  "aedes_albopictus": 608
  }
 }
